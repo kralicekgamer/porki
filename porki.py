@@ -8,9 +8,7 @@ from typing import Iterable
 import psutil
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
-from textual.screen import ModalScreen
-from textual.widgets import DataTable, Header, Label, Static
+from textual.widgets import DataTable, Header, Static
 
 
 @dataclass(frozen=True)
@@ -22,54 +20,6 @@ class Connection:
     local: str
     remote: str
     status: str
-
-
-class KillConfirmation(ModalScreen[bool]):
-    CSS = """
-    KillConfirmation {
-        align: center middle;
-    }
-
-    #dialog {
-        width: 58;
-        height: auto;
-        padding: 1 2;
-        border: tall #e06c75;
-        background: #161a20;
-    }
-
-    #dialog-title {
-        color: #e06c75;
-        text-style: bold;
-        margin-bottom: 1;
-    }
-
-    #dialog-actions {
-        margin-top: 1;
-        color: #abb2bf;
-    }
-    """
-
-    def __init__(self, connection: Connection) -> None:
-        super().__init__()
-        self.connection = connection
-
-    def compose(self) -> ComposeResult:
-        yield Vertical(
-            Label("KILL PROCESS", id="dialog-title"),
-            Static(
-                f"Terminate {self.connection.process} (PID {self.connection.pid})?\n"
-                f"Port {self.connection.port} / {self.connection.status}"
-            ),
-            Static("Enter confirm   Esc cancel", id="dialog-actions"),
-            id="dialog",
-        )
-
-    def on_key(self, event) -> None:
-        if event.key == "enter":
-            self.dismiss(True)
-        elif event.key == "escape":
-            self.dismiss(False)
 
 
 class Porki(App[None]):
@@ -142,7 +92,6 @@ class Porki(App[None]):
         table = self.query_one(DataTable)
         table.add_columns("PID", "PROCESS", "PORT", "PROTO", "LOCAL", "REMOTE", "STATE")
         self.refresh_connections()
-        self.set_interval(3, self.refresh_connections)
 
     def action_refresh(self) -> None:
         self.refresh_connections()
@@ -184,11 +133,9 @@ class Porki(App[None]):
         if connection.pid <= 0:
             self.notify("Kernel socket has no terminable process", severity="warning")
             return
-        self.push_screen(KillConfirmation(connection), self.finish_kill(connection))
+        self.finish_kill(connection)
 
-    def finish_kill(self, connection: Connection, confirmed: bool) -> None:
-        if not confirmed:
-            return
+    def finish_kill(self, connection: Connection) -> None:
         try:
             process = psutil.Process(connection.pid)
             if process.pid == os.getpid():
